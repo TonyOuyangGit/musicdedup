@@ -159,3 +159,31 @@ def test_fetch_spotify_raises_on_404(mocker):
             client_id="id",
             client_secret="secret",
         )
+
+
+def test_fetch_spotify_handles_pagination(mocker):
+    mock_sp = MagicMock()
+    mock_sp.playlist.return_value = {
+        "name": "Large Playlist",
+        "id": "abc123",
+        "tracks": {
+            "items": [{"track": {"name": "Track 1", "artists": [{"name": "Artist 1"}]}}],
+            "next": "https://api.spotify.com/v1/playlists/abc123/tracks?offset=1",
+        },
+    }
+    mock_sp.next.return_value = {
+        "items": [{"track": {"name": "Track 2", "artists": [{"name": "Artist 2"}]}}],
+        "next": None,
+    }
+    mocker.patch("fetcher.spotipy.Spotify", return_value=mock_sp)
+    mocker.patch("fetcher.SpotifyClientCredentials", return_value=MagicMock())
+
+    result = fetch_spotify(
+        "https://open.spotify.com/playlist/abc123",
+        client_id="id",
+        client_secret="secret",
+    )
+    assert len(result["tracks"]) == 2
+    assert result["tracks"][0] == {"title": "Track 1", "artist": "Artist 1"}
+    assert result["tracks"][1] == {"title": "Track 2", "artist": "Artist 2"}
+    mock_sp.next.assert_called_once()
