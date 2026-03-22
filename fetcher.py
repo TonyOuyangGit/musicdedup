@@ -18,7 +18,7 @@ def detect_source(url: str) -> str:
     if "open.spotify.com" in host:
         path = parsed.path.lstrip("/")
         resource = path.split("/")[0] if path else ""
-        if resource != "playlist":
+        if resource.lower() != "playlist":
             raise FetchError(
                 f"Spotify URL is not a playlist (got {resource!r}): {url}"
             )
