@@ -236,3 +236,17 @@ def test_fetch_youtube_music_preserves_duplicates(mocker):
 
     result = fetch_youtube_music("https://music.youtube.com/playlist?list=PLxxx")
     assert len(result["tracks"]) == 2
+
+
+def test_fetch_youtube_music_raises_on_missing_playlist_id(mocker):
+    mocker.patch("fetcher.YTMusic")
+    with pytest.raises(FetchError, match="missing playlist ID"):
+        fetch_youtube_music("https://music.youtube.com/playlist")
+
+
+def test_fetch_youtube_music_raises_on_api_error(mocker):
+    mock_ytm = MagicMock()
+    mock_ytm.get_playlist.side_effect = Exception("network error")
+    mocker.patch("fetcher.YTMusic", return_value=mock_ytm)
+    with pytest.raises(FetchError, match="YouTube Music API error"):
+        fetch_youtube_music("https://music.youtube.com/playlist?list=PLxxx")

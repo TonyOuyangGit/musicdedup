@@ -119,8 +119,13 @@ def fetch_youtube_music(url: str) -> dict:
     Returns: {"name": str, "playlist_id": str, "tracks": list[{"title": str, "artist": str}]}
     """
     playlist_id = _extract_playlist_id_from_ytm_url(url)
+    if not playlist_id:
+        raise FetchError(f"Invalid YouTube Music URL (missing playlist ID): {url}")
     ytm = YTMusic()
-    data = ytm.get_playlist(playlist_id, limit=None)
+    try:
+        data = ytm.get_playlist(playlist_id, limit=None)
+    except Exception as e:
+        raise FetchError(f"YouTube Music API error: {e}") from e
 
     if not data:
         raise FetchError(f"YouTube Music playlist not found or inaccessible: {url}")
