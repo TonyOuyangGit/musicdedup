@@ -71,3 +71,91 @@ def test_sanitize_falls_back_to_playlist_id_when_empty():
 def test_sanitize_falls_back_to_playlist_id_when_all_symbols():
     result = sanitize_playlist_name("!!!---!!!", fallback_id="abc123")
     assert result == "abc123"
+
+
+# --- Spotify fetcher ---
+from unittest.mock import MagicMock, patch
+from fetcher import fetch_spotify
+
+def test_fetch_spotify_raises_when_credentials_missing():
+    with pytest.raises(FetchError, match="SPOTIFY_CLIENT_ID"):
+        fetch_spotify(
+            "https://open.spotify.com/playlist/abc123",
+            client_id=None,
+            client_secret="secret",
+        )
+
+
+def test_fetch_spotify_raises_when_secret_missing():
+    with pytest.raises(FetchError, match="SPOTIFY_CLIENT_SECRET"):
+        fetch_spotify(
+            "https://open.spotify.com/playlist/abc123",
+            client_id="id",
+            client_secret=None,
+        )
+
+
+def test_fetch_spotify_returns_tracks_and_name(mocker):
+    mock_sp = MagicMock()
+    mock_sp.playlist.return_value = {
+        "name": "Wedding Mix",
+        "id": "abc123",
+        "tracks": {
+            "items": [
+                {"track": {"name": "Perfect", "artists": [{"name": "Ed Sheeran"}]}},
+                {"track": {"name": "Thinking Out Loud", "artists": [{"name": "Ed Sheeran"}]}},
+            ],
+            "next": None,
+        },
+    }
+    mocker.patch("fetcher.spotipy.Spotify", return_value=mock_sp)
+    mocker.patch("fetcher.SpotifyClientCredentials", return_value=MagicMock())
+
+    result = fetch_spotify(
+        "https://open.spotify.com/playlist/abc123",
+        client_id="id",
+        client_secret="secret",
+    )
+    assert result["name"] == "wedding-mix"
+    assert result["playlist_id"] == "abc123"
+    assert len(result["tracks"]) == 2
+    assert result["tracks"][0] == {"title": "Perfect", "artist": "Ed Sheeran"}
+
+
+def test_fetch_spotify_preserves_duplicate_tracks(mocker):
+    mock_sp = MagicMock()
+    mock_sp.playlist.return_value = {
+        "name": "Mix",
+        "id": "abc123",
+        "tracks": {
+            "items": [
+                {"track": {"name": "Perfect", "artists": [{"name": "Ed Sheeran"}]}},
+                {"track": {"name": "Perfect", "artists": [{"name": "Ed Sheeran"}]}},
+            ],
+            "next": None,
+        },
+    }
+    mocker.patch("fetcher.spotipy.Spotify", return_value=mock_sp)
+    mocker.patch("fetcher.SpotifyClientCredentials", return_value=MagicMock())
+
+    result = fetch_spotify(
+        "https://open.spotify.com/playlist/abc123",
+        client_id="id",
+        client_secret="secret",
+    )
+    assert len(result["tracks"]) == 2
+
+
+def test_fetch_spotify_raises_on_404(mocker):
+    import spotipy
+    mock_sp = MagicMock()
+    mock_sp.playlist.side_effect = spotipy.SpotifyException(404, -1, "Not found")
+    mocker.patch("fetcher.spotipy.Spotify", return_value=mock_sp)
+    mocker.patch("fetcher.SpotifyClientCredentials", return_value=MagicMock())
+
+    with pytest.raises(FetchError, match="not found or is private"):
+        fetch_spotify(
+            "https://open.spotify.com/playlist/abc123",
+            client_id="id",
+            client_secret="secret",
+        )

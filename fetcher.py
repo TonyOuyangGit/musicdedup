@@ -1,5 +1,9 @@
 import re
+from typing import Optional
 from urllib.parse import urlparse
+
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 
 
 class FetchError(Exception):
@@ -39,3 +43,63 @@ def sanitize_playlist_name(name: str, fallback_id: str = "") -> str:
     if not sanitized:
         return fallback_id
     return sanitized
+
+
+def _extract_playlist_id_from_spotify_url(url: str) -> str:
+    parsed = urlparse(url)
+    # path is like /playlist/<id>
+    parts = parsed.path.strip("/").split("/")
+    return parts[1] if len(parts) >= 2 else ""
+
+
+def fetch_spotify(url: str, client_id: Optional[str], client_secret: Optional[str]) -> dict:
+    """Fetch tracks from a Spotify playlist URL.
+
+    Returns: {"name": str, "playlist_id": str, "tracks": list[{"title": str, "artist": str}]}
+    """
+    if not client_id:
+        raise FetchError(
+            "SPOTIFY_CLIENT_ID is not set. Add it to your .env file."
+        )
+    if not client_secret:
+        raise FetchError(
+            "SPOTIFY_CLIENT_SECRET is not set. Add it to your .env file."
+        )
+
+    auth = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+    sp = spotipy.Spotify(auth_manager=auth)
+
+    playlist_id = _extract_playlist_id_from_spotify_url(url)
+
+    try:
+        data = sp.playlist(playlist_id)
+    except spotipy.SpotifyException as e:
+        if e.http_status in (403, 404):
+            raise FetchError(
+                f"Spotify playlist not found or is private: {url}"
+            ) from e
+        raise FetchError(f"Spotify API error: {e}") from e
+
+    raw_name = data.get("name", "")
+    pid = data.get("id", playlist_id)
+    sanitized_name = sanitize_playlist_name(raw_name, fallback_id=pid)
+
+    tracks = []
+    items = data["tracks"]["items"]
+    while True:
+        for item in items:
+            track = item.get("track")
+            if not track:
+                continue
+            title = track.get("name", "")
+            artists = track.get("artists", [])
+            artist = artists[0]["name"] if artists else ""
+            tracks.append({"title": title, "artist": artist})
+
+        next_page = data["tracks"].get("next")
+        if not next_page:
+            break
+        data["tracks"] = sp.next(data["tracks"])
+        items = data["tracks"]["items"]
+
+    return {"name": sanitized_name, "playlist_id": pid, "tracks": tracks}
