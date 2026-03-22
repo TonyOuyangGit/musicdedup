@@ -35,7 +35,7 @@ def _parse_filename(filepath: str) -> dict:
     return {"title": stem.strip(), "artist": ""}
 
 
-def scan_library(library_path: str) -> list:
+def scan_library(library_path: str) -> list[dict]:
     """Walk library_path and return a list of {title, artist, filepath} dicts."""
     results = []
     for dirpath, _dirnames, filenames in os.walk(library_path):
