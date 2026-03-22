@@ -1,6 +1,4 @@
 import csv
-import os
-from pathlib import Path
 from matcher import MatchResult
 from reporter import print_results, write_csv
 
