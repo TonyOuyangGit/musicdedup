@@ -187,3 +187,52 @@ def test_fetch_spotify_handles_pagination(mocker):
     assert result["tracks"][0] == {"title": "Track 1", "artist": "Artist 1"}
     assert result["tracks"][1] == {"title": "Track 2", "artist": "Artist 2"}
     mock_sp.next.assert_called_once()
+
+
+# --- YouTube Music fetcher ---
+from fetcher import fetch_youtube_music
+
+def test_fetch_youtube_music_returns_tracks_and_name(mocker):
+    mock_ytm = MagicMock()
+    mock_ytm.get_playlist.return_value = {
+        "title": "First Dance Songs",
+        "id": "PLxxx",
+        "tracks": [
+            {"title": "Can't Help Falling in Love", "artists": [{"name": "Elvis Presley"}]},
+            {"title": "At Last", "artists": [{"name": "Etta James"}]},
+        ],
+    }
+    mocker.patch("fetcher.YTMusic", return_value=mock_ytm)
+
+    result = fetch_youtube_music("https://music.youtube.com/playlist?list=PLxxx")
+    assert result["name"] == "first-dance-songs"
+    assert len(result["tracks"]) == 2
+    assert result["tracks"][0] == {
+        "title": "Can't Help Falling in Love",
+        "artist": "Elvis Presley",
+    }
+
+
+def test_fetch_youtube_music_raises_on_not_found(mocker):
+    mock_ytm = MagicMock()
+    mock_ytm.get_playlist.return_value = None
+    mocker.patch("fetcher.YTMusic", return_value=mock_ytm)
+
+    with pytest.raises(FetchError, match="not found or inaccessible"):
+        fetch_youtube_music("https://music.youtube.com/playlist?list=PLxxx")
+
+
+def test_fetch_youtube_music_preserves_duplicates(mocker):
+    mock_ytm = MagicMock()
+    mock_ytm.get_playlist.return_value = {
+        "title": "Mix",
+        "id": "PLxxx",
+        "tracks": [
+            {"title": "At Last", "artists": [{"name": "Etta James"}]},
+            {"title": "At Last", "artists": [{"name": "Etta James"}]},
+        ],
+    }
+    mocker.patch("fetcher.YTMusic", return_value=mock_ytm)
+
+    result = fetch_youtube_music("https://music.youtube.com/playlist?list=PLxxx")
+    assert len(result["tracks"]) == 2

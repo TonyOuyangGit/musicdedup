@@ -1,9 +1,10 @@
 import re
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from ytmusicapi import YTMusic
 
 
 class FetchError(Exception):
@@ -101,5 +102,38 @@ def fetch_spotify(url: str, client_id: Optional[str], client_secret: Optional[st
             break
         data["tracks"] = sp.next(data["tracks"])
         items = data["tracks"]["items"]
+
+    return {"name": sanitized_name, "playlist_id": pid, "tracks": tracks}
+
+
+def _extract_playlist_id_from_ytm_url(url: str) -> str:
+    parsed = urlparse(url)
+    qs = parse_qs(parsed.query)
+    ids = qs.get("list", [])
+    return ids[0] if ids else ""
+
+
+def fetch_youtube_music(url: str) -> dict:
+    """Fetch tracks from a YouTube Music playlist URL.
+
+    Returns: {"name": str, "playlist_id": str, "tracks": list[{"title": str, "artist": str}]}
+    """
+    playlist_id = _extract_playlist_id_from_ytm_url(url)
+    ytm = YTMusic()
+    data = ytm.get_playlist(playlist_id, limit=None)
+
+    if not data:
+        raise FetchError(f"YouTube Music playlist not found or inaccessible: {url}")
+
+    raw_name = data.get("title", "")
+    pid = data.get("id", playlist_id)
+    sanitized_name = sanitize_playlist_name(raw_name, fallback_id=pid)
+
+    tracks = []
+    for item in data.get("tracks", []):
+        title = item.get("title", "")
+        artists = item.get("artists", [])
+        artist = artists[0]["name"] if artists else ""
+        tracks.append({"title": title, "artist": artist})
 
     return {"name": sanitized_name, "playlist_id": pid, "tracks": tracks}
