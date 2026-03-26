@@ -1,5 +1,5 @@
 import csv
-from matcher import MatchResult
+from matcher import MatchResult, CandidateMatch
 from reporter import print_results, write_csv
 
 
@@ -59,3 +59,44 @@ def test_write_csv_overwrites_existing_file(tmp_path):
     content = out_path.read_text()
     assert "old content" not in content
     assert "playlist_track" in content
+
+
+def make_candidate_result():
+    return MatchResult(
+        playlist_title="Low (feat. T-Pain)",
+        playlist_artist="Flo Rida",
+        status="Candidate",
+        matched_filepath="",
+        match_score=72.0,
+        candidates=[
+            CandidateMatch(filepath="/music/Low (Quick Hit Dirty).mp3", score=72.0),
+            CandidateMatch(filepath="/music/Flo Rida - Low.mp3", score=61.0),
+        ],
+    )
+
+
+def test_print_results_shows_candidate_under_missing(capsys):
+    results = make_results() + [make_candidate_result()]
+    print_results(results)
+    out = capsys.readouterr().out
+    # Candidate appears in MISSING section
+    assert "Low (feat. T-Pain)" in out
+    # Candidate lines use ~ prefix
+    assert "~ possible:" in out
+    assert "Low (Quick Hit Dirty)" in out
+
+
+def test_print_results_summary_counts_candidate_separately(capsys):
+    results = make_results() + [make_candidate_result()]
+    print_results(results)
+    out = capsys.readouterr().out
+    # Summary: 1 found, 1 candidate, 1 missing (make_results has 1 Found + 1 Missing)
+    assert "1 candidate" in out
+    assert "1 missing" in out
+
+
+def test_print_results_candidate_shows_score(capsys):
+    print_results([make_candidate_result()])
+    out = capsys.readouterr().out
+    assert "[72]" in out
+    assert "[61]" in out

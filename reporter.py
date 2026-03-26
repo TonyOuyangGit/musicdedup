@@ -5,6 +5,7 @@ from matcher import MatchResult
 def print_results(results: list[MatchResult]) -> None:
     found = [r for r in results if r.status == "Found"]
     missing = [r for r in results if r.status == "Missing"]
+    candidates = [r for r in results if r.status == "Candidate"]
 
     print("\n=== FOUND ===")
     if found:
@@ -15,13 +16,20 @@ def print_results(results: list[MatchResult]) -> None:
         print("  (none)")
 
     print("\n=== MISSING ===")
-    if missing:
+    if missing or candidates:
         for r in missing:
             print(f"  {r.playlist_artist} - {r.playlist_title}")
+        for r in candidates:
+            print(f"  {r.playlist_artist} - {r.playlist_title}")
+            for c in r.candidates:
+                name = c.filepath.split("/")[-1]
+                print(f"    ~ possible: {name}  [{c.score:.0f}]")
     else:
         print("  (none)")
 
-    print(f"\nSummary: {len(found)} found, {len(missing)} missing.\n")
+    print(
+        f"\nSummary: {len(found)} found, {len(candidates)} candidate, {len(missing)} missing.\n"
+    )
 
 
 def write_csv(results: list[MatchResult], output_path: str) -> None:
