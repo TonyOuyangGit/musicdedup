@@ -33,14 +33,27 @@ def print_results(results: list[MatchResult]) -> None:
 
 
 def write_csv(results: list[MatchResult], output_path: str) -> None:
-    fieldnames = ["playlist_track", "artist", "status", "matched_local_file"]
+    fieldnames = [
+        "playlist_track", "artist", "status", "matched_local_file", "match_score"
+    ]
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for r in results:
-            writer.writerow({
-                "playlist_track": r.playlist_title,
-                "artist": r.playlist_artist,
-                "status": r.status,
-                "matched_local_file": r.matched_filepath,
-            })
+            if r.status == "Candidate":
+                for c in r.candidates:
+                    writer.writerow({
+                        "playlist_track": r.playlist_title,
+                        "artist": r.playlist_artist,
+                        "status": "Candidate",
+                        "matched_local_file": c.filepath,
+                        "match_score": c.score,
+                    })
+            else:
+                writer.writerow({
+                    "playlist_track": r.playlist_title,
+                    "artist": r.playlist_artist,
+                    "status": r.status,
+                    "matched_local_file": r.matched_filepath,
+                    "match_score": r.match_score if r.status == "Found" else "",
+                })

@@ -36,7 +36,9 @@ def test_write_csv_has_correct_columns(tmp_path):
     write_csv(make_results(), str(out_path))
     with open(out_path, newline="") as f:
         reader = csv.DictReader(f)
-        assert reader.fieldnames == ["playlist_track", "artist", "status", "matched_local_file"]
+        assert reader.fieldnames == [
+            "playlist_track", "artist", "status", "matched_local_file", "match_score"
+        ]
 
 
 def test_write_csv_correct_rows(tmp_path):
@@ -100,3 +102,44 @@ def test_print_results_candidate_shows_score(capsys):
     out = capsys.readouterr().out
     assert "[72]" in out
     assert "[61]" in out
+
+
+def test_write_csv_found_row_includes_score(tmp_path):
+    out_path = tmp_path / "report.csv"
+    result = MatchResult("Perfect", "Ed Sheeran", "Found", "/music/perfect.mp3", match_score=100.0)
+    write_csv([result], str(out_path))
+    with open(out_path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["match_score"] == "100.0"
+
+
+def test_write_csv_missing_row_has_blank_score(tmp_path):
+    out_path = tmp_path / "report.csv"
+    result = MatchResult("Song", "Artist", "Missing", "")
+    write_csv([result], str(out_path))
+    with open(out_path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["match_score"] == ""
+    assert rows[0]["matched_local_file"] == ""
+
+
+def test_write_csv_candidate_emits_one_row_per_candidate(tmp_path):
+    out_path = tmp_path / "report.csv"
+    write_csv([make_candidate_result()], str(out_path))
+    with open(out_path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 2
+    assert rows[0]["status"] == "Candidate"
+    assert rows[0]["matched_local_file"] == "/music/Low (Quick Hit Dirty).mp3"
+    assert rows[0]["match_score"] == "72.0"
+    assert rows[1]["matched_local_file"] == "/music/Flo Rida - Low.mp3"
+    assert rows[1]["match_score"] == "61.0"
+
+
+def test_write_csv_candidate_rows_share_playlist_track(tmp_path):
+    out_path = tmp_path / "report.csv"
+    write_csv([make_candidate_result()], str(out_path))
+    with open(out_path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["playlist_track"] == rows[1]["playlist_track"] == "Low (feat. T-Pain)"
+    assert rows[0]["artist"] == rows[1]["artist"] == "Flo Rida"
