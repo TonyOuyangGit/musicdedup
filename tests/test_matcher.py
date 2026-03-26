@@ -183,16 +183,18 @@ def test_candidate_capped_at_two():
 
 
 def test_candidates_ordered_by_score_descending():
-    """First candidate has higher or equal score than second."""
+    """First candidate has strictly higher score than second."""
     playlist = [{"artist": "Taylor Swift", "title": "Love Story"}]
     library = [
+        # "Love Story 2021" scores ~90.2 via token_sort_ratio
         {"artist": "Taylor Swift", "title": "Love Story 2021", "filepath": "/a.mp3"},
-        {"artist": "Taylor Swift", "title": "Love Story 2022", "filepath": "/b.mp3"},
+        # "Love Story Radio" scores ~88.5 — clearly lower, ensuring strict ordering
+        {"artist": "Taylor Swift", "title": "Love Story Radio", "filepath": "/b.mp3"},
     ]
     results = match_tracks(playlist, library, threshold=100)
     assert results[0].status == "Candidate"
     assert len(results[0].candidates) == 2
-    assert results[0].candidates[0].score >= results[0].candidates[1].score
+    assert results[0].candidates[0].score > results[0].candidates[1].score
 
 
 def test_below_candidate_floor_is_missing():
