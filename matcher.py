@@ -26,11 +26,19 @@ def strip_annotations(s: str) -> str:
 
 
 @dataclass
+class CandidateMatch:
+    filepath: str
+    score: float
+
+
+@dataclass
 class MatchResult:
     playlist_title: str
     playlist_artist: str
-    status: str          # "Found" or "Missing"
+    status: str          # "Found" | "Missing" | "Candidate"
     matched_filepath: str
+    match_score: float = 0.0
+    candidates: list[CandidateMatch] = field(default_factory=list)
 
 
 def build_comparison_string(artist: str, title: str) -> str:
