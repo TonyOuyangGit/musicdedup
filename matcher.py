@@ -4,7 +4,7 @@ from rapidfuzz import fuzz, utils
 
 
 _PARENS_RE = re.compile(r'\([^)]*\)')
-_FEAT_RE = re.compile(r'\s+(?:ft\.?|feat\.?|featuring)\s+.*', re.IGNORECASE)
+_FEAT_RE = re.compile(r'\s+(?:ft\.?|feat\.?|featuring)\s+(?:(?! - ).)*', re.IGNORECASE)
 _WHITESPACE_RE = re.compile(r'\s{2,}')
 
 
@@ -55,24 +55,43 @@ def match_tracks(
 ) -> list[MatchResult]:
     """Match each playlist track against the local library.
 
+    Uses two-pass scoring (full string + annotation-stripped) and takes the max.
     Returns a MatchResult for every playlist track (duplicates preserved).
     """
-    # Pre-compute comparison strings for the library once
     library_strings = [
         build_comparison_string(t["artist"], t["title"]) for t in library_tracks
     ]
+    library_strings_stripped = [strip_annotations(s) for s in library_strings]
 
     results = []
     for track in playlist_tracks:
         query = build_comparison_string(track["artist"], track["title"])
-        best_score = -1
-        best_filepath = ""
+        query_stripped = strip_annotations(query)
 
-        for i, lib_string in enumerate(library_strings):
-            score = fuzz.token_sort_ratio(query, lib_string, processor=utils.default_process)
-            if score > best_score:
-                best_score = score
-                best_filepath = library_tracks[i]["filepath"]
+        scored = []
+        for i, (lib_str, lib_stripped) in enumerate(
+            zip(library_strings, library_strings_stripped)
+        ):
+            full_score = fuzz.token_sort_ratio(
+                query, lib_str, processor=utils.default_process
+            )
+            stripped_score = fuzz.token_sort_ratio(
+                query_stripped, lib_stripped, processor=utils.default_process
+            )
+            scored.append((max(full_score, stripped_score), library_tracks[i]["filepath"]))
+
+        if not scored:
+            results.append(
+                MatchResult(
+                    playlist_title=track["title"],
+                    playlist_artist=track["artist"],
+                    status="Missing",
+                    matched_filepath="",
+                )
+            )
+            continue
+
+        best_score, best_filepath = max(scored, key=lambda x: x[0])
 
         if best_score >= threshold:
             results.append(
@@ -81,6 +100,24 @@ def match_tracks(
                     playlist_artist=track["artist"],
                     status="Found",
                     matched_filepath=best_filepath,
+                    match_score=best_score,
+                )
+            )
+        elif best_score >= threshold - CANDIDATE_MARGIN:
+            in_zone = sorted(
+                [(s, fp) for s, fp in scored if s >= threshold - CANDIDATE_MARGIN],
+                key=lambda x: x[0],
+                reverse=True,
+            )[:2]
+            candidates = [CandidateMatch(filepath=fp, score=s) for s, fp in in_zone]
+            results.append(
+                MatchResult(
+                    playlist_title=track["title"],
+                    playlist_artist=track["artist"],
+                    status="Candidate",
+                    matched_filepath="",
+                    match_score=best_score,
+                    candidates=candidates,
                 )
             )
         else:
