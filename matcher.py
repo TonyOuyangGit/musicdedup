@@ -1,5 +1,28 @@
-from dataclasses import dataclass
-from rapidfuzz import fuzz
+import re
+from dataclasses import dataclass, field
+from rapidfuzz import fuzz, utils
+
+
+_PARENS_RE = re.compile(r'\([^)]*\)')
+_FEAT_RE = re.compile(r'\s+(?:ft\.?|feat\.?|featuring)\s+.*', re.IGNORECASE)
+_WHITESPACE_RE = re.compile(r'\s{2,}')
+
+
+CANDIDATE_MARGIN = 15
+
+
+def strip_annotations(s: str) -> str:
+    """Remove version annotations and featuring clauses for relaxed comparison.
+
+    Steps (in order):
+    1. Remove all parenthesised content — (Radio Edit), (feat. X), etc.
+    2. Remove bare featuring clauses — ft X, feat. X, featuring X.
+    3. Collapse runs of whitespace and strip edges.
+    """
+    s = _PARENS_RE.sub('', s)
+    s = _FEAT_RE.sub('', s)
+    s = _WHITESPACE_RE.sub(' ', s)
+    return s.strip()
 
 
 @dataclass
@@ -38,7 +61,7 @@ def match_tracks(
         best_filepath = ""
 
         for i, lib_string in enumerate(library_strings):
-            score = fuzz.WRatio(query, lib_string)
+            score = fuzz.token_sort_ratio(query, lib_string, processor=utils.default_process)
             if score > best_score:
                 best_score = score
                 best_filepath = library_tracks[i]["filepath"]

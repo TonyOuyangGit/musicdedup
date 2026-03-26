@@ -1,5 +1,5 @@
 import pytest
-from matcher import build_comparison_string, match_tracks, MatchResult
+from matcher import build_comparison_string, match_tracks, MatchResult, strip_annotations
 
 
 def test_comparison_string_with_artist():
@@ -79,3 +79,36 @@ def test_local_track_without_artist_can_still_match():
     library = [{"title": "Perfect", "artist": "", "filepath": "/music/perfect.mp3"}]
     results = match_tracks([playlist_track], library, threshold=60)
     assert results[0].status == "Found"
+
+
+def test_strip_removes_parens():
+    assert strip_annotations("Clarity (Radio Edit)") == "Clarity"
+
+
+def test_strip_removes_feat_in_parens():
+    assert strip_annotations("Low (feat. T-Pain)") == "Low"
+
+
+def test_strip_removes_bare_ft():
+    assert strip_annotations("Clarity - Zedd ft Foxes") == "Clarity - Zedd"
+
+
+def test_strip_removes_bare_feat_dot():
+    assert strip_annotations("Song feat. Artist") == "Song"
+
+
+def test_strip_removes_bare_featuring():
+    assert strip_annotations("Song featuring Artist Name") == "Song"
+
+
+def test_strip_clean_string_unchanged():
+    assert strip_annotations("Zedd - Clarity") == "Zedd - Clarity"
+
+
+def test_strip_collapses_whitespace_after_parens():
+    # Removing "(Radio Edit)" leaves double space; must collapse to single
+    assert strip_annotations("Clarity (Radio Edit) - Zedd") == "Clarity - Zedd"
+
+
+def test_strip_multiple_parens():
+    assert strip_annotations("Song (Intro Clean) (Dirty)") == "Song"
