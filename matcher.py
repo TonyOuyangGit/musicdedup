@@ -4,7 +4,10 @@ from rapidfuzz import fuzz, utils
 
 
 _PARENS_RE = re.compile(r'\([^)]*\)')
-_FEAT_RE = re.compile(r'\s+(?:ft\.?|feat\.?|featuring)\s+(?:(?! - ).)*', re.IGNORECASE)
+_FEAT_RE = re.compile(
+    r'\s+(?:ft\.?|feat\.?|featuring)\s+(?:(?! - ).)*',
+    re.IGNORECASE,
+)  # (?! - ) stops before the artist-title separator, so "Zedd ft Foxes - Clarity" → "Zedd - Clarity"
 _WHITESPACE_RE = re.compile(r'\s{2,}')
 
 

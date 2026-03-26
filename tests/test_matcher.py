@@ -77,6 +77,8 @@ def test_tie_uses_first_in_scan_order():
 def test_local_track_without_artist_can_still_match():
     playlist_track = {"title": "Perfect", "artist": "Ed Sheeran"}
     library = [{"title": "Perfect", "artist": "", "filepath": "/music/perfect.mp3"}]
+    # token_sort_ratio("ed perfect sheeran", "perfect") ≈ 56; threshold=50 reflects that
+    # a library track with no artist tag is an inherently weak match
     results = match_tracks([playlist_track], library, threshold=50)
     assert results[0].status == "Found"
 
@@ -185,11 +187,12 @@ def test_candidates_ordered_by_score_descending():
     playlist = [{"artist": "Taylor Swift", "title": "Love Story"}]
     library = [
         {"artist": "Taylor Swift", "title": "Love Story 2021", "filepath": "/a.mp3"},
-        {"artist": "Taylor Swift", "title": "Love Story Live Version Extended", "filepath": "/b.mp3"},
+        {"artist": "Taylor Swift", "title": "Love Story 2022", "filepath": "/b.mp3"},
     ]
     results = match_tracks(playlist, library, threshold=100)
-    if results[0].status == "Candidate" and len(results[0].candidates) == 2:
-        assert results[0].candidates[0].score >= results[0].candidates[1].score
+    assert results[0].status == "Candidate"
+    assert len(results[0].candidates) == 2
+    assert results[0].candidates[0].score >= results[0].candidates[1].score
 
 
 def test_below_candidate_floor_is_missing():
